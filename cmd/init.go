@@ -22,35 +22,71 @@ package cmd
 
 import (
 	"fmt"
+	"html/template"
+	"os"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
+
+const mediumTOML = `[[user]]
+name = "{{.Name}}"
+token = ""
+workspace = "{{.Workspace}}"
+`
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("init called")
-	},
+	Short: "Initialize your medium workspace",
+	Long: `
+`,
+	RunE: initialize,
 }
 
 func init() {
 	RootCmd.AddCommand(initCmd)
+}
 
-	// Here you will define your flags and configuration settings.
+func initialize(cmd *cobra.Command, args []string) error {
+	fmt.Println("[init] Create toml file to set user info")
+	err := createTOML()
+	if err != nil {
+		return errors.Wrap(err, "failed to create toml")
+	}
+	return nil
+}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
+func createTOML() error {
+	f, err := os.Create("medium.toml")
+	if err != nil {
+		return errors.Wrap(err, "failed to create medium.toml")
+	}
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	var name string
+	fmt.Print("Username: ")
+	fmt.Scanln(&name)
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return errors.Wrap(err, "failed to get current dir path")
+	}
+
+	UserInfo := struct {
+		Name, Workspace string
+	}{Name: name, Workspace: currentDir}
+
+	// Create a new template and parse the letter into it.
+	t := template.Must(template.New("mediumTOML").Parse(mediumTOML))
+	if err := t.Execute(f, UserInfo); err != nil {
+		return errors.Wrap(err, "failed to write template to toml")
+	}
+
+	return nil
 }
