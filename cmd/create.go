@@ -22,23 +22,30 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
+const infoTemplate = `[[info]]
+title = ""
+tags = [""]
+format = "markdown"
+content_path = "content.md"
+`
+
 // createCmd represents the create command
 var createCmd = &cobra.Command{
-	Use:   "create",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
-	},
+	Use:   "create DIRNAME",
+	Short: "create new directory to post",
+	Long: `Create New Directory to write post.
+DIRNAME
+├── content.md
+└── info.toml
+`,
+	RunE: createNewPostDir,
 }
 
 func init() {
@@ -53,4 +60,51 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+func createNewPostDir(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return errors.Errorf("args must be only one. got %d", len(args))
+	}
+
+	d, err := getWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to get workspace")
+	}
+
+	// create dir by args name
+	article := filepath.Join(d, args[0])
+	err = os.Mkdir(article, 0775)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create directory %s", filepath.Join(d, args[0]))
+	}
+
+	// create toml and markdown in it
+	info, err := os.Create(filepath.Join(article, "info.toml"))
+	if err != nil {
+		return errors.Wrap(err, "failed to create post infomation toml file")
+	}
+	defer func() {
+		err := info.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	_, err = fmt.Fprint(info, infoTemplate)
+	if err != nil {
+		return errors.Wrap(err, "failed to write template to info.toml")
+	}
+
+	c, err := os.Create(filepath.Join(article, "content.md"))
+	if err != nil {
+		return errors.Wrap(err, "failed to create content.md file")
+	}
+	defer func() {
+		err := c.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	fmt.Println("[create] finished")
+	return nil
 }
