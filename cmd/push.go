@@ -22,23 +22,21 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
+	"github.com/pelletier/go-toml"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 // pushCmd represents the push command
 var pushCmd = &cobra.Command{
 	Use:   "push",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("push called")
-	},
+	Short: "publish your article to medium",
+	Long: `
+`,
+	RunE: publishArticle,
 }
 
 func init() {
@@ -53,4 +51,67 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// pushCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func publishArticle(cmd *cobra.Command, args []string) error {
+	m, err := getMediumClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to create Medium Client")
+	}
+
+	// もしauthorID が不明なら取得して書き込む
+	author, err := getAuthorID()
+	if err != nil {
+		return errors.Wrap(err, "failed to get Author ID")
+	}
+	fmt.Println("author is ", author)
+	if author == "" {
+		u, err := m.GetUser("")
+		if err != nil {
+			return errors.Wrap(err, "failed to get user infomation from medium")
+		}
+
+		author = u.ID
+		err = setAuthorID(author)
+		if err != nil {
+			return errors.Wrap(err, "failed to write authorID")
+		}
+	}
+
+	if len(args) != 1 {
+		return errors.New("args is not only one.")
+	}
+
+	ws, err := getWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to get workspace path")
+	}
+
+	article := filepath.Join(ws, args[0])
+	_, err = os.Stat(article)
+	if err != nil {
+		return errors.Wrap(err, "failed to get dir to post")
+	}
+
+	// info.toml取ってくる
+	config, err := toml.LoadFile(filepath.Join(article, "info.toml"))
+	if err != nil {
+		return errors.Wrap(err, "failed to load infomation toml")
+	}
+
+	// 必要な情報を取得
+	cpo, err := getPostOptions(config, article)
+	if err != nil {
+		return errors.Wrap(err, "failed to get information from toml object")
+	}
+	cpo.UserID = author
+
+	p, err := m.CreatePost(*cpo)
+	if err != nil {
+		return errors.Wrap(err, "failed to post content to medium")
+	}
+
+	fmt.Printf("[Post] suceed to post\nURL: %s\n", p.URL)
+	// 実際にポストする
+	return nil
 }
