@@ -105,6 +105,6 @@ func createNewPostDir(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	fmt.Println("[create] finished")
+	fmt.Printf("[create] Created %s in %s\n", args[0], d)
 	return nil
 }

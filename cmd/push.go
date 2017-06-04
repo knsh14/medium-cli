@@ -54,34 +54,11 @@ func init() {
 }
 
 func publishArticle(cmd *cobra.Command, args []string) error {
-	m, err := getMediumClient()
-	if err != nil {
-		return errors.Wrap(err, "failed to create Medium Client")
-	}
-
-	// もしauthorID が不明なら取得して書き込む
-	author, err := getAuthorID()
-	if err != nil {
-		return errors.Wrap(err, "failed to get Author ID")
-	}
-	fmt.Println("author is ", author)
-	if author == "" {
-		u, err := m.GetUser("")
-		if err != nil {
-			return errors.Wrap(err, "failed to get user infomation from medium")
-		}
-
-		author = u.ID
-		err = setAuthorID(author)
-		if err != nil {
-			return errors.Wrap(err, "failed to write authorID")
-		}
-	}
-
 	if len(args) != 1 {
 		return errors.New("args is not only one.")
 	}
 
+	// info.toml取ってくる
 	ws, err := getWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to get workspace path")
@@ -93,25 +70,37 @@ func publishArticle(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to get dir to post")
 	}
 
-	// info.toml取ってくる
 	config, err := toml.LoadFile(filepath.Join(article, "info.toml"))
 	if err != nil {
 		return errors.Wrap(err, "failed to load infomation toml")
 	}
 
 	// 必要な情報を取得
+	// info.toml から情報を引っ張ってきてPostできるように整形
 	cpo, err := getPostOptions(config, article)
 	if err != nil {
 		return errors.Wrap(err, "failed to get information from toml object")
 	}
-	cpo.UserID = author
 
+	// UserID (見た目に出るIDとはべつのもの) を取得する
+	m, err := getMediumClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to create Medium Client")
+	}
+	u, err := m.GetUser("")
+	if err != nil {
+		return errors.Wrap(err, "failed to get user infomation from medium")
+	}
+	cpo.UserID = u.ID
+	fmt.Printf("[Post] you post new Story as %s", u.Username)
+
+	// 実際にポストする
 	p, err := m.CreatePost(*cpo)
 	if err != nil {
 		return errors.Wrap(err, "failed to post content to medium")
 	}
 
+	// 成功したらURLを出力して終了
 	fmt.Printf("[Post] suceed to post\nURL: %s\n", p.URL)
-	// 実際にポストする
 	return nil
 }

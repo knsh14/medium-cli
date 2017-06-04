@@ -24,13 +24,14 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"path/filepath"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 const mediumTOML = `[[user]]
-name = "{{.Name}}"
 token = ""
 workspace = "{{.Workspace}}"
 `
@@ -58,7 +59,13 @@ func initialize(cmd *cobra.Command, args []string) error {
 }
 
 func createTOML() error {
-	f, err := os.Create("medium.toml")
+
+	home, err := homedir.Dir()
+	if err != nil {
+		return errors.Wrap(err, "faild to get home dir path")
+	}
+
+	f, err := os.Create(filepath.Join(home, "medium.toml"))
 	if err != nil {
 		return errors.Wrap(err, "failed to create medium.toml")
 	}
@@ -69,18 +76,14 @@ func createTOML() error {
 		}
 	}()
 
-	var name string
-	fmt.Print("Username: ")
-	fmt.Scanln(&name)
-
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return errors.Wrap(err, "failed to get current dir path")
 	}
 
 	UserInfo := struct {
-		Name, Workspace string
-	}{Name: name, Workspace: currentDir}
+		Workspace string
+	}{Workspace: currentDir}
 
 	// Create a new template and parse the letter into it.
 	t := template.Must(template.New("mediumTOML").Parse(mediumTOML))

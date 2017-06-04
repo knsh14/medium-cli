@@ -3,16 +3,21 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	medium "github.com/medium/medium-sdk-go"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
 func getMediumClient() (*medium.Medium, error) {
-	config, err := toml.LoadFile("medium.toml")
+	home, err := homedir.Dir()
+	if err != nil {
+		return nil, errors.Wrap(err, "faild to get home dir path")
+	}
+
+	config, err := toml.LoadFile(filepath.Join(home, "medium.toml"))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load medium.toml")
 	}
@@ -28,7 +33,12 @@ func getMediumClient() (*medium.Medium, error) {
 }
 
 func getWorkspace() (string, error) {
-	config, err := toml.LoadFile("medium.toml")
+	home, err := homedir.Dir()
+	if err != nil {
+		return "", errors.Wrap(err, "faild to get home dir path")
+	}
+
+	config, err := toml.LoadFile(filepath.Join(home, "medium.toml"))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to load medium.toml")
 	}
@@ -38,54 +48,6 @@ func getWorkspace() (string, error) {
 		return "", errors.New("user.workspace is not in medium.toml")
 	}
 	return dir.(string), nil
-}
-
-func getAuthorID() (string, error) {
-	config, err := toml.LoadFile("medium.toml")
-	if err != nil {
-		return "", errors.Wrap(err, "failed to load medium.toml")
-	}
-
-	if !config.Has("user.author_id") {
-		return "", nil
-	}
-
-	return config.Get("user.author_id").(string), nil
-}
-
-func getUserName() (string, error) {
-	config, err := toml.LoadFile("medium.toml")
-	if err != nil {
-		return "", errors.Wrap(err, "failed to load medium.toml")
-	}
-
-	if !config.Has("user.name") {
-		return "", nil
-	}
-
-	return config.Get("user.name").(string), nil
-}
-
-func setAuthorID(s string) error {
-	config, err := toml.LoadFile("medium.toml")
-	if err != nil {
-		return errors.Wrap(err, "failed to load medium.toml")
-	}
-
-	config.Set("user.author_id", s)
-	f, err := os.Open("medium.toml")
-	if err != nil {
-		return errors.Wrap(err, "failed to open medium.toml")
-	}
-	defer func() {
-		err := f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	config.WriteTo(f)
-	return nil
 }
 
 func getPostOptions(t *toml.TomlTree, p string) (*medium.CreatePostOptions, error) {
